@@ -2,7 +2,7 @@
 """
 
 
-from stanfordnlp.server import CoreNLPClient
+from stanza.server import CoreNLPClient
 
 
 def process_document(doc, doc_id=None):

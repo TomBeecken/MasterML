@@ -2,12 +2,9 @@ import datetime
 import itertools
 import os
 from pathlib import Path
-
-from stanfordnlp.server import CoreNLPClient
-
+from stanza.server import CoreNLPClient
 import global_options
 from culture import file_util, preprocess
-
 
 def process_line(line, lineID):
     """Process each line and return a tuple of sentences, sentence_IDs, 
@@ -103,10 +100,7 @@ def process_largefile(
 
 if __name__ == "__main__":
     with CoreNLPClient(
-        properties={
-            "ner.applyFineGrained": "false",
-            "annotators": "tokenize, ssplit, pos, lemma, ner, depparse",
-        },
+        annotators=['tokenize','ssplit','pos','lemma','ner', 'depparse'],
         memory=global_options.RAM_CORENLP,
         threads=global_options.N_CORES,
         timeout=12000000,
@@ -131,3 +125,5 @@ if __name__ == "__main__":
             function_name=process_line,
             chunk_size=global_options.PARSE_CHUNK_SIZE,
         )
+
+

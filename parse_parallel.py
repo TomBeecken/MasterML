@@ -7,7 +7,7 @@ import os
 from multiprocessing import Pool
 from pathlib import Path
 
-from stanfordnlp.server import CoreNLPClient
+from stanza.server import CoreNLPClient
 
 import global_options
 from culture import file_util, preprocess_parallel
