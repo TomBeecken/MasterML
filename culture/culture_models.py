@@ -1,4 +1,5 @@
 from . import file_util
+from gensim import models
 import tqdm
 import global_options
 import gensim
@@ -26,15 +27,15 @@ def train_bigram_model(input_path, model_path):
     print(datetime.datetime.now())
     print("Training phraser...")
     corpus = gensim.models.word2vec.PathLineSentences(
-        str(input_path), max_sentence_length=20000000
+        str(input_path), max_sentence_length=10000000
     )
     n_lines = file_util.line_counter(input_path)
-    bigram_model = gensim.models.phrases.Phrases(
+    bigram_model = models.phrases.Phrases(
         tqdm.tqdm(corpus, total=n_lines),
         min_count=global_options.PHRASE_MIN_COUNT,
         scoring="default",
         threshold=global_options.PHRASE_THRESHOLD,
-        #common_terms=global_options.STOPWORDS,
+        # common_terms=global_options.STOPWORDS,
     )
     bigram_model.save(str(model_path))
     return bigram_model

@@ -29,7 +29,8 @@ def process_largefile_multithreaded(input_file, output_file, input_file_ids, out
 
     try:
         with open(output_index_file, 'r') as file:
-            lines = set([line[:line.find(".F")+2] for line in file])
+            lines = set([line[:line.find("_")]
+                         for line in file.readlines()])
     except FileNotFoundError:
         lines = set()
         # Ensure output files are empty if starting fresh
@@ -40,7 +41,7 @@ def process_largefile_multithreaded(input_file, output_file, input_file_ids, out
     if start_index == 0:
         for index, id in enumerate(input_file_ids):
             if id in lines:
-                start_index = index + 1
+                start_index = index
             else:
                 break
 
