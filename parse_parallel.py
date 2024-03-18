@@ -38,13 +38,28 @@ def process_largefile(
         Write the ouput_file and output_index_file
     """
     try:
+        with open(output_index_file, 'r') as file:
+            # Read all lines into a list
+            lines = set([line[:line.find(".F")+2]
+                        for line in file.readlines()])
         if start_index is None:
-            # if start from the first line, remove existing output file
-            # else append to existing output file
-            os.remove(str(output_file))
-            os.remove(str(output_index_file))
-    except OSError:
-        pass
+            for index, id in enumerate(input_file_ids):
+                if index == len(input_file_ids)-1:
+                    start_index = index
+                elif id in lines:
+                    continue
+                else:
+                    start_index = index
+                    break
+    except:
+        try:
+            if start_index is None:
+                # if start from the first line, remove existing output file
+                # else append to existing output file
+                os.remove(str(output_file))
+                os.remove(str(output_index_file))
+        except OSError:
+            pass
     assert file_util.line_counter(input_file) == len(
         input_file_ids
     ), "Make sure the input file has the same number of rows as the input ID file. "
