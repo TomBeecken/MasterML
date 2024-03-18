@@ -53,6 +53,7 @@ def process_largefile(
         line_i = 0
         # jump to index
         if start_index is not None:
+            print(f"Jumping to {start_index}")
             # start at start_index line
             for _ in range(start_index):
                 next(f_in)
@@ -93,7 +94,8 @@ if __name__ == "__main__":
         memory=global_options.RAM_CORENLP,
         threads=global_options.N_CORES,
         timeout=12000000,
-        endpoint="http://localhost:9002",  # change port here and in preprocess_parallel.py if 9002 is occupied
+        # change port here and in preprocess_parallel.py if 9002 is occupied
+        endpoint="http://localhost:9002",
         max_char_length=1000000,
     ) as client:
         in_file = Path(global_options.DATA_FOLDER, "input", "documents.txt")
