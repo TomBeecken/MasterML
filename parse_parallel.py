@@ -7,10 +7,11 @@ import os
 from multiprocessing import Pool
 from pathlib import Path
 
-from stanza.server import CoreNLPClient
+from stanza.server import CoreNLPClient, StartServer
 
 import global_options
 from culture import file_util, preprocess_parallel
+import logging
 
 
 def process_largefile(
@@ -37,6 +38,7 @@ def process_largefile(
     Writes:
         Write the ouput_file and output_index_file
     """
+    logging.getLogger('stanza').setLevel(logging.CRITICAL)
     try:
         with open(output_index_file, 'r') as file:
             # Read all lines into a list
@@ -80,10 +82,10 @@ def process_largefile(
             itertools.zip_longest(*[iter(input_file_ids)] * chunk_size),
         ):
             line_i += chunk_size
-            print(datetime.datetime.now())
             print(f"Processing line: {line_i}.")
-            next_n_lines = list(filter(None.__ne__, next_n_lines))
-            next_n_line_ids = list(filter(None.__ne__, next_n_line_ids))
+            next_n_lines = list(filter(lambda x: x is not None, next_n_lines))
+            next_n_line_ids = list(
+                filter(lambda x: x is not None, next_n_line_ids))
             output_lines = []
             output_line_ids = []
             with Pool(global_options.N_CORES) as pool:
@@ -103,6 +105,7 @@ def process_largefile(
 
 if __name__ == "__main__":
     with CoreNLPClient(
+        start_server=StartServer.TRY_START,
         properties={
             "ner.applyFineGrained": "false",
             "annotators": "tokenize, ssplit, pos, lemma, ner, depparse",
@@ -112,6 +115,7 @@ if __name__ == "__main__":
         timeout=12000000,
         # change port here and in preprocess_parallel.py if 9002 is occupied
         endpoint="http://localhost:9002",
+        be_quiet=True,
         max_char_length=1000000,
     ) as client:
         in_file = Path(global_options.DATA_FOLDER, "input", "documents.txt")

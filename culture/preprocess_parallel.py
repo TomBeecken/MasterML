@@ -2,7 +2,7 @@
 """
 
 
-from stanza.server import CoreNLPClient
+from stanza.server import CoreNLPClient, StartServer
 
 
 def process_document(doc, doc_id=None):
@@ -30,7 +30,7 @@ def process_document(doc, doc_id=None):
     Note:
         When the doc is empty, both doc_id and sentences processed will be too. (@TODO: fix for consistensy)
     """
-    with CoreNLPClient(endpoint="http://localhost:9002", start_server=False, timeout=120000000) as client:
+    with CoreNLPClient(endpoint="http://localhost:9002", start_server=StartServer.TRY_START, timeout=120000000, be_quiet=True) as client:
         doc_ann = client.annotate(doc)
     sentences_processed = []
     doc_sent_ids = []
