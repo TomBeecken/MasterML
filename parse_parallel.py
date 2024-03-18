@@ -7,6 +7,7 @@ from stanza.server import CoreNLPClient
 import global_options
 from culture.file_util import file_to_list, line_counter
 from culture.preprocess import preprocessor
+from tqdm import tqdm
 
 
 def process_line(args):
@@ -50,6 +51,9 @@ def process_largefile_multithreaded(input_file, output_file, input_file_ids, out
             open(output_file, 'a', encoding='utf-8') as f_out, \
             open(output_index_file, 'a', encoding='utf-8') as f_index_out:
 
+        # Count the total number of chunks
+        total_chunks = (len(input_file_ids) - start_index) // chunk_size + 1
+
         for i, batch in enumerate(itertools.islice(itertools.zip_longest(*[f_in] * chunk_size), start_index // chunk_size, None)):
             lines = [x for x in batch if x is not None]
             lineIDs = input_file_ids[i * chunk_size +
@@ -58,7 +62,7 @@ def process_largefile_multithreaded(input_file, output_file, input_file_ids, out
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 futures = {executor.submit(
                     process_line, (line, lineID, preprocessor)): lineID for line, lineID in zip(lines, lineIDs)}
-                for future in as_completed(futures):
+                for future in tqdm(as_completed(futures), total=len(futures), desc=f"Chunk {i+1 + start_index // chunk_size}/{total_chunks}"):
                     sentences, ids = future.result()
                     if sentences and ids:
                         f_out.write(sentences + '\n')
@@ -79,6 +83,7 @@ if __name__ == "__main__":
         timeout=12000000,
         endpoint="http://localhost:9002",
         be_quiet=True,
+        max_char_length=2000000
     ) as client:
         preprocessor_instance = preprocessor(client)
         input_file_path = Path(global_options.DATA_FOLDER,

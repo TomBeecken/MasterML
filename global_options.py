@@ -5,16 +5,16 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 # Hardware options
-N_CORES: int = 6  # max number of CPU cores to use
+N_CORES: int = 20  # max number of CPU cores to use
 # max RAM allocated for parsing using CoreNLP; increase to speed up parsing
-RAM_CORENLP: str = "8G"
+RAM_CORENLP: str = "24G"
 # number of lines in the input file to process uing CoreNLP at once. Increase on workstations with larger RAM (e.g. to 1000 if RAM is 64G)
 PARSE_CHUNK_SIZE: int = 100
 
 # Directory locations
 os.environ[
     "CORENLP_HOME"
-] = "/Users/femu/stanza_corenlp"  # location of the CoreNLP models; use / to seperate folders
+] = "/root/stanza_corenlp"  # location of the CoreNLP models; use / to seperate folders
 DATA_FOLDER: str = "data/"
 MODEL_FOLDER: str = "models/"  # will be created if does not exist
 # will be created if does not exist; !!! WARNING: existing files will be removed !!!
