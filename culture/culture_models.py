@@ -1,27 +1,24 @@
+from . import file_util
+import tqdm
+import global_options
+import gensim
+from pathlib import Path
+from multiprocessing import Pool, freeze_support
+from functools import partial
+import datetime
+import concurrent.futures
 import sys
 
 sys.path.append("..")
-import concurrent.futures
-import datetime
-from functools import partial
-from multiprocessing import Pool, freeze_support
-from pathlib import Path
-
-import gensim
-import global_options
-import tqdm
-from gensim import models
-
-from . import file_util
 
 
 def train_bigram_model(input_path, model_path):
     """ Train a phrase model and save it to the disk. 
-    
+
     Arguments:
         input_path {str or Path} -- input corpus
         model_path {str or Path} -- where to save the trained phrase model?
-    
+
     Returns:
         gensim.models.phrases.Phrases -- the trained phrase model
     """
@@ -29,15 +26,15 @@ def train_bigram_model(input_path, model_path):
     print(datetime.datetime.now())
     print("Training phraser...")
     corpus = gensim.models.word2vec.PathLineSentences(
-        str(input_path), max_sentence_length=10000000
+        str(input_path), max_sentence_length=20000000
     )
     n_lines = file_util.line_counter(input_path)
-    bigram_model = models.phrases.Phrases(
+    bigram_model = gensim.models.phrases.Phrases(
         tqdm.tqdm(corpus, total=n_lines),
         min_count=global_options.PHRASE_MIN_COUNT,
         scoring="default",
         threshold=global_options.PHRASE_THRESHOLD,
-        common_terms=global_options.STOPWORDS,
+        #common_terms=global_options.STOPWORDS,
     )
     bigram_model.save(str(model_path))
     return bigram_model
@@ -72,7 +69,8 @@ def file_bigramer(input_path, output_path, model_path, threshold=None, scoring=N
     # bigram_phraser = models.phrases.Phraser(bigram_model)
     with open(input_path, "r") as f:
         input_data = f.readlines()
-    data_bigram = [bigram_transform(l, bigram_model) for l in tqdm.tqdm(input_data)]
+    data_bigram = [bigram_transform(l, bigram_model)
+                   for l in tqdm.tqdm(input_data)]
     with open(output_path, "w") as f:
         f.write("\n".join(data_bigram) + "\n")
     assert len(input_data) == file_util.line_counter(output_path)
@@ -81,7 +79,7 @@ def file_bigramer(input_path, output_path, model_path, threshold=None, scoring=N
 def train_w2v_model(input_path, model_path, *args, **kwargs):
     """ Train a word2vec model using the LineSentence file in input_path, 
     save the model to model_path.count
-    
+
     Arguments:
         input_path {str} -- Corpus for training, each line is a sentence
         model_path {str} -- Where to save the model? 

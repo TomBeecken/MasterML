@@ -15,7 +15,7 @@ logging.basicConfig(stream=sys.stdout, level=logging.DEBUG)
 
 def clean_file(in_file, out_file):
     """clean the entire corpus (output from CoreNLP)
-    
+
     Arguments:
         in_file {str or Path} -- input corpus, each line is a sentence
         out_file {str or Path} -- output corpus
@@ -35,8 +35,10 @@ def clean_file(in_file, out_file):
 
 # clean the parsed text (remove POS tags, stopwords, etc.) ----------------
 clean_file(
-    in_file=Path(global_options.DATA_FOLDER, "processed", "parsed", "documents.txt"),
-    out_file=Path(global_options.DATA_FOLDER, "processed", "unigram", "documents.txt"),
+    in_file=Path(global_options.DATA_FOLDER,
+                 "processed", "parsed", "documents.txt"),
+    out_file=Path(global_options.DATA_FOLDER, "processed",
+                  "unigram", "documents.txt"),
 )
 
 
@@ -61,11 +63,13 @@ culture_models.file_bigramer(
 
 # train and apply a phrase model to detect 3-word phrases ----------------
 culture_models.train_bigram_model(
-    input_path=Path(global_options.DATA_FOLDER, "processed", "bigram", "documents.txt"),
+    input_path=Path(global_options.DATA_FOLDER,
+                    "processed", "bigram", "documents.txt"),
     model_path=Path(global_options.MODEL_FOLDER, "phrases", "trigram.mod"),
 )
 culture_models.file_bigramer(
-    input_path=Path(global_options.DATA_FOLDER, "processed", "bigram", "documents.txt"),
+    input_path=Path(global_options.DATA_FOLDER,
+                    "processed", "bigram", "documents.txt"),
     output_path=Path(
         global_options.DATA_FOLDER, "processed", "trigram", "documents.txt"
     ),
@@ -82,8 +86,8 @@ culture_models.train_w2v_model(
         global_options.DATA_FOLDER, "processed", "trigram", "documents.txt"
     ),
     model_path=Path(global_options.MODEL_FOLDER, "w2v", "w2v.mod"),
-    size=global_options.W2V_DIM,
+    vector_size=global_options.W2V_DIM,
     window=global_options.W2V_WINDOW,
     workers=global_options.N_CORES,
-    iter=global_options.W2V_ITER,
+    epochs=global_options.W2V_ITER,
 )
