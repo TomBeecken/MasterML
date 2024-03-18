@@ -6,13 +6,14 @@ from stanza.server import CoreNLPClient
 import global_options
 from culture import file_util, preprocess
 
+
 def process_line(line, lineID):
     """Process each line and return a tuple of sentences, sentence_IDs, 
-    
+
     Arguments:
         line {str} -- a document 
         lineID {str} -- the document ID
-    
+
     Returns:
         str, str -- processed document with each sentence in a line, 
                     sentence IDs with each in its own line: lineID_0 lineID_1 ...
@@ -52,13 +53,30 @@ def process_largefile(
         Write the ouput_file and output_index_file
     """
     try:
+        with open(output_index_file, 'r') as file:
+            # Read all lines into a list
+            lines = set([line[:line.find(".F")+2]
+                        for line in file.readlines()])
         if start_index is None:
-            # if start from the first line, remove existing output file
-            # else append to existing output file
-            os.remove(str(output_file))
-            os.remove(str(output_index_file))
-    except OSError:
-        pass
+            for index, id in enumerate(input_file_ids):
+                if index == len(input_file_ids)-1:
+                    print("Already done")
+                    return
+                elif id in lines:
+                    continue
+                else:
+                    start_index = index
+                    break
+        print(f"Done {start_index} of {len(input_file_ids)-1}")
+    except:
+        try:
+            if start_index is None:
+                # if start from the first line, remove existing output file
+                # else append to existing output file
+                os.remove(str(output_file))
+                os.remove(str(output_index_file))
+        except OSError:
+            pass
     assert file_util.line_counter(input_file) == len(
         input_file_ids
     ), "Make sure the input file has the same number of rows as the input ID file. "
@@ -79,8 +97,9 @@ def process_largefile(
             line_i += chunk_size
             print(datetime.datetime.now())
             print(f"Processing line: {line_i}.")
-            next_n_lines = list(filter(None.__ne__, next_n_lines))
-            next_n_line_ids = list(filter(None.__ne__, next_n_line_ids))
+            next_n_lines = list(filter(lambda x: x is not None, next_n_lines))
+            next_n_line_ids = list(
+                filter(lambda x: x is not None, next_n_line_ids))
             output_lines = []
             output_line_ids = []
             # Use parse_parallel.py to speed things up
@@ -100,11 +119,17 @@ def process_largefile(
 
 if __name__ == "__main__":
     with CoreNLPClient(
-        annotators=['tokenize','ssplit','pos','lemma','ner', 'depparse'],
+        properties={
+            "ner.applyFineGrained": "false",
+            "annotators": "tokenize, ssplit, pos, lemma, ner, depparse",
+        },
         memory=global_options.RAM_CORENLP,
         threads=global_options.N_CORES,
         timeout=12000000,
-        max_char_length=1000000,
+        # change port here and in preprocess_parallel.py if 9002 is occupied
+        endpoint="http://localhost:9002",
+        max_char_length=2000000,
+        be_quiet=True,
     ) as client:
         corpus_preprocessor = preprocess.preprocessor(client)
         in_file = Path(global_options.DATA_FOLDER, "input", "documents.txt")
@@ -125,5 +150,3 @@ if __name__ == "__main__":
             function_name=process_line,
             chunk_size=global_options.PARSE_CHUNK_SIZE,
         )
-
-

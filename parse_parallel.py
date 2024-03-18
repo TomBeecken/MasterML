@@ -1,138 +1,105 @@
-"""Implementation of parse.py that supports multiprocess
-Main differences are 1) using Pool.starmap in process_largefile and 2) attach to local CoreNLP server in process_largefile.process_document
-"""
 import datetime
 import itertools
 import os
-from multiprocessing import Pool
 from pathlib import Path
-
-from stanza.server import CoreNLPClient, StartServer
-
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from stanza.server import CoreNLPClient
 import global_options
-from culture import file_util, preprocess_parallel
-import logging
+from culture.file_util import file_to_list, line_counter
+from culture.preprocess import preprocessor
 
 
-def process_largefile(
-    input_file,
-    output_file,
-    input_file_ids,
-    output_index_file,
-    function_name,
-    chunk_size=100,
-    start_index=None,
-):
-    """ A helper function that transforms an input file + a list of IDs of each line (documents + document_IDs) to two output files (processed documents + processed document IDs) by calling function_name on chunks of the input files. Each document can be decomposed into multiple processed documents (e.g. sentences). 
-    Supports parallel with Pool.
+def process_line(args):
+    line, lineID, preprocessor = args
+    try:
+        sentences_processed, doc_sent_ids = preprocessor.process_document(
+            line, lineID)
+        return "\n".join(sentences_processed), "\n".join(doc_sent_ids)
+    except Exception as e:
+        print(f"Exception in line: {lineID} - {e}")
+        return "", ""  # Return empty strings on exception to maintain output consistency
 
-    Arguments:
-        input_file {str or Path} -- path to a text file, each line is a document
-        ouput_file {str or Path} -- processed linesentence file (remove if exists)
-        input_file_ids {str]} -- a list of input line ids
-        output_index_file {str or Path} -- path to the index file of the output
-        function_name {callable} -- A function that processes a list of strings, list of ids and return a list of processed strings and ids.
-        chunk_size {int} -- number of lines to process each time, increasing the default may increase performance
-        start_index {int} -- line number to start from (index starts with 0)
 
-    Writes:
-        Write the ouput_file and output_index_file
-    """
-    logging.getLogger('stanza').setLevel(logging.CRITICAL)
+def process_largefile_multithreaded(input_file, output_file, input_file_ids, output_index_file, preprocessor, chunk_size, max_workers, start_index=None):
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
+    # Initialize start_index if None
+    start_index = start_index or 0
+
     try:
         with open(output_index_file, 'r') as file:
-            # Read all lines into a list
-            lines = set([line[:line.find(".F")+2]
-                        for line in file.readlines()])
-        if start_index is None:
-            for index, id in enumerate(input_file_ids):
-                if index == len(input_file_ids)-1:
-                    start_index = index
-                elif id in lines:
-                    continue
-                else:
-                    start_index = index
-                    break
-        print(f"Done {start_index} of {len(input_file_ids)}")
-    except:
-        try:
-            if start_index is None:
-                # if start from the first line, remove existing output file
-                # else append to existing output file
-                os.remove(str(output_file))
-                os.remove(str(output_index_file))
-        except OSError:
-            pass
-    assert file_util.line_counter(input_file) == len(
-        input_file_ids
-    ), "Make sure the input file has the same number of rows as the input ID file. "
+            lines = set([line[:line.find(".F")+2] for line in file])
+    except FileNotFoundError:
+        lines = set()
+        # Ensure output files are empty if starting fresh
+        open(output_file, 'w').close()
+        open(output_index_file, 'w').close()
 
-    with open(input_file, newline="\n", encoding="utf-8", errors="ignore") as f_in:
-        line_i = 0
-        # jump to index
-        if start_index is not None:
-            print(f"Jumping to {start_index}")
-            # start at start_index line
-            for _ in range(start_index):
-                next(f_in)
-            input_file_ids = input_file_ids[start_index:]
-            line_i = start_index
-        for next_n_lines, next_n_line_ids in zip(
-            itertools.zip_longest(*[f_in] * chunk_size),
-            itertools.zip_longest(*[iter(input_file_ids)] * chunk_size),
-        ):
-            line_i += chunk_size
-            print(f"Processing line: {line_i}.")
-            next_n_lines = list(filter(lambda x: x is not None, next_n_lines))
-            next_n_line_ids = list(
-                filter(lambda x: x is not None, next_n_line_ids))
-            output_lines = []
-            output_line_ids = []
-            with Pool(global_options.N_CORES) as pool:
-                for output_line, output_line_id in pool.starmap(
-                    function_name, zip(next_n_lines, next_n_line_ids)
-                ):
-                    output_lines.append(output_line)
-                    output_line_ids.append(output_line_id)
-            output_lines = "\n".join(output_lines) + "\n"
-            output_line_ids = "\n".join(output_line_ids) + "\n"
-            with open(output_file, "a", newline="\n") as f_out:
-                f_out.write(output_lines)
-            if output_index_file is not None:
-                with open(output_index_file, "a", newline="\n") as f_out:
-                    f_out.write(output_line_ids)
+    # Update start_index based on processed documents, if not explicitly set
+    if start_index == 0:
+        for index, id in enumerate(input_file_ids):
+            if id in lines:
+                start_index = index + 1
+            else:
+                break
+
+    print(
+        f"Starting from index {start_index}. Processing {len(input_file_ids) - start_index} documents out of {len(input_file_ids)}")
+
+    with open(input_file, 'r', encoding='utf-8') as f_in, \
+            open(output_file, 'a', encoding='utf-8') as f_out, \
+            open(output_index_file, 'a', encoding='utf-8') as f_index_out:
+
+        for i, batch in enumerate(itertools.islice(itertools.zip_longest(*[f_in] * chunk_size), start_index // chunk_size, None)):
+            lines = [x for x in batch if x is not None]
+            lineIDs = input_file_ids[i * chunk_size +
+                                     start_index: (i + 1) * chunk_size + start_index]
+
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                futures = {executor.submit(
+                    process_line, (line, lineID, preprocessor)): lineID for line, lineID in zip(lines, lineIDs)}
+                for future in as_completed(futures):
+                    sentences, ids = future.result()
+                    if sentences and ids:
+                        f_out.write(sentences + '\n')
+                        f_index_out.write(ids + '\n')
+
+            print(
+                f"Processed chunk {i+1 + start_index // chunk_size} at {datetime.datetime.now()}")
 
 
 if __name__ == "__main__":
     with CoreNLPClient(
-        start_server=StartServer.TRY_START,
         properties={
             "ner.applyFineGrained": "false",
-            "annotators": "tokenize, ssplit, pos, lemma, ner, depparse",
+            "annotators": "tokenize,ssplit,pos,lemma,ner,depparse",
         },
         memory=global_options.RAM_CORENLP,
         threads=global_options.N_CORES,
         timeout=12000000,
-        # change port here and in preprocess_parallel.py if 9002 is occupied
         endpoint="http://localhost:9002",
         be_quiet=True,
-        max_char_length=1000000,
     ) as client:
-        in_file = Path(global_options.DATA_FOLDER, "input", "documents.txt")
-        in_file_index = file_util.file_to_list(
-            Path(global_options.DATA_FOLDER, "input", "document_ids.txt")
-        )
-        out_file = Path(
-            global_options.DATA_FOLDER, "processed", "parsed", "documents.txt"
-        )
-        output_index_file = Path(
-            global_options.DATA_FOLDER, "processed", "parsed", "document_sent_ids.txt"
-        )
-        process_largefile(
-            input_file=in_file,
-            output_file=out_file,
-            input_file_ids=in_file_index,
-            output_index_file=output_index_file,
-            function_name=preprocess_parallel.process_document,
+        preprocessor_instance = preprocessor(client)
+        input_file_path = Path(global_options.DATA_FOLDER,
+                               "input", "documents.txt")
+        output_file_path = Path(
+            global_options.DATA_FOLDER, "processed", "parsed", "documents.txt")
+        output_index_file_path = Path(
+            global_options.DATA_FOLDER, "processed", "parsed", "document_ids.txt")
+        input_file_ids = file_to_list(
+            Path(global_options.DATA_FOLDER, "input", "document_ids.txt"))
+
+        assert line_counter(input_file_path) == len(
+            input_file_ids), "Input file and ID file line counts do not match."
+
+        process_largefile_multithreaded(
+            input_file=input_file_path,
+            output_file=output_file_path,
+            input_file_ids=input_file_ids,
+            output_index_file=output_index_file_path,
+            preprocessor=preprocessor_instance,
             chunk_size=global_options.PARSE_CHUNK_SIZE,
+            max_workers=global_options.N_CORES,
+            start_index=None  # or specify a start index if needed
         )
