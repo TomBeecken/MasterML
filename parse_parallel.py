@@ -51,6 +51,7 @@ def process_largefile(
                 else:
                     start_index = index
                     break
+        print(f"Done {start_index} of {len(input_file_ids)}")
     except:
         try:
             if start_index is None:
