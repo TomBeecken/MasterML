@@ -91,7 +91,7 @@ if __name__ == "__main__":
         output_file_path = Path(
             global_options.DATA_FOLDER, "processed", "parsed", "documents.txt")
         output_index_file_path = Path(
-            global_options.DATA_FOLDER, "processed", "parsed", "document_ids.txt")
+            global_options.DATA_FOLDER, "processed", "parsed", "document_sent_ids.txt")
         input_file_ids = file_to_list(
             Path(global_options.DATA_FOLDER, "input", "document_ids.txt"))
 
